@@ -11,6 +11,9 @@ CRuby の公開 C API が raise（longjmp）しうるかを、LLVM IR の呼び�
 
 [![raise-survey](https://github.com/takahashim/ruby-c-apis/actions/workflows/raise-survey.yml/badge.svg)](https://github.com/takahashim/ruby-c-apis/actions/workflows/raise-survey.yml)
 
+結果は関数ごとに `official`（`ruby/internal/` 以外の公式ヘッダ）と `internal`
+（`ruby/internal/` 配下）を区別して表示します。
+
 ## 使い方
 
 ```sh
@@ -24,6 +27,7 @@ open site/index.html
 
 ## GitHub Actions
 
-`main` への push、手動実行、毎月のスケジュールで走ります。結果は GitHub Pages に
-`index.html` と `data.json` としてデプロイされます。初回はリポジトリの
-**Settings → Pages → Source** を **GitHub Actions** にしてください。
+`main` への push、手動実行、毎月のスケジュールで走ります。既定では最新パッチ版
+（3.3.13、3.4.12、4.0.9）と Ruby HEAD を、Linux x86_64 と macOS arm64 の 2 構成で
+調べます。結果は GitHub Pages に `index.html` と `data.json` としてデプロイされます。
+初回はリポジトリの **Settings → Pages → Source** を **GitHub Actions** にしてください。

@@ -29,18 +29,20 @@
 - clang（bitcode を出せるもの）
 - `llvm-link` / `llvm-dis`
 - make、tar、curl
+- HEAD を調べる場合のみ: git、autoconf、automake、libtool、bison 3 以降
 
 macOS では Homebrew の LLVM を使います。Apple clang でもビルドはできますが、
 Xcode 26 / macOS 26 の Apple clang 21 でビルドした Ruby 3.4.9 が起動直後に
 落ちることを確認しているため、CI でも Homebrew LLVM を使います。
 
 ```sh
-brew install llvm
+brew install llvm autoconf automake libtool bison
+export PATH="$(brew --prefix bison)/bin:$PATH"
 export PATH="$(brew --prefix llvm)/bin:$PATH"
 export CCBC_REAL_CC="$(brew --prefix llvm)/bin/clang"
 
 ruby script/raise_survey/run.rb \
-  --release 3.4.9 \
+  --release 3.4.12 \
   --config macos-arm64 \
   --work work \
   --out out \
@@ -52,7 +54,7 @@ Linux:
 ```sh
 sudo apt-get install -y build-essential clang llvm
 ruby script/raise_survey/run.rb \
-  --release 3.4.9 \
+  --release 3.4.12 \
   --config linux-x86_64 \
   --work work \
   --out out \
@@ -87,7 +89,7 @@ ruby script/raise_survey/survey.rb \
 - `main` への push（`script/raise_survey/**` などを変更したとき）
 - 手動実行 `workflow_dispatch`
   - `releases`: カンマ区切り（空なら `script/raise_survey/releases.txt`）
-  - `all_releases`: 3.3 以降の全安定版を調査する
+  - `all_releases`: 3.3 以降の全安定版と HEAD を調査する
   - `indirect`: `any`（既定、最も保守的）または `typed`
 - 毎月 1 日のスケジュール実行（全安定版）
 
@@ -99,14 +101,18 @@ Pages が無効なら有効化を試みますが、リポジトリの設定に�
 
 ### 対象リリース
 
-`script/raise_survey/releases.txt` に trial 用の 3 リリースを置いています。
-全リリースは `workflow_dispatch` の `all_releases`、または
+`script/raise_survey/releases.txt` に最新パッチ版（3.3.13、3.4.12、4.0.9）と
+HEAD を置いています。全リリースは `workflow_dispatch` の `all_releases`、または
 
 ```sh
 ruby script/raise_survey/prepare.rb --all
 ```
 
 で確認できます。プレリリース（preview / rc）は含めません。
+
+`HEAD` は GitHub の `ruby/ruby` master を、実行時点の commit SHA に固定して
+取得します。git チェックアウトには `configure` が含まれないため、取得後に
+`autogen.sh`（autoreconf）で生成します。結果には `build.head_sha` が入ります。
 
 ## 出力
 
@@ -116,11 +122,13 @@ ruby script/raise_survey/prepare.rb --all
 {
   "name": "rb_array_len",
   "header": "ruby/internal/core/rarray.h",
+  "internal": true,
   "kind": "inline",
   "results": {
-    "3.4.9|macos-arm64|any": { "status": "no_path" },
-    "3.4.9|linux-x86_64|any": { "status": "no_path" }
+    "3.4.12|macos-arm64|any": { "status": "no_path" },
+    "3.4.12|linux-x86_64|any": { "status": "no_path" }
   },
+  "scope": "internal",
   "overall": "no_path_all",
   "raise_count": 0,
   "no_path_count": 2,
@@ -132,10 +140,17 @@ ruby script/raise_survey/prepare.rb --all
 - `status: raises`: 経路がある。`path` に例、`target` に到達した脱出点
 - `status: not_defined`: ヘッダにあるが、そのビルドの `libruby` に実体がない
 - `status: unsupported_inline`: `static inline` だがラッパーを生成できなかった
+- `scope: official`: 宣言が `ruby/internal/` 以外の公式ヘッダにある
+- `scope: internal`: 宣言が `ruby/internal/` 配下にある
+- `scope: mixed`: 版によって official / internal が変わる
 
 HTML の表では、全実行で `no_path` のものを「全リリースで経路なし」、1 つでも
 `raises` のものを「raise しうる」と表示します。行をクリックすると、リリース ×
 構成ごとの判定と経路の例が出ます。
+
+「API 範囲」の列とフィルタで、公式ヘッダ（`ruby/internal/` 以外）と
+`ruby/internal/` 配下を分けられます。同じ関数でも版によって宣言位置が変わる
+場合は「混在」になります。
 
 ## 解析の詳細
 
@@ -183,11 +198,14 @@ long survey_inline_rb_array_len(VALUE p0) {
 - `make install` はしません。ヘッダはソースツリーの `include/` と、ビルド時の
   `.ext/include/<arch>/ruby/config.h` を使います。`make install` は拡張ライブラリも
   ビルドするため、OpenSSL など無関係な失敗で止まりやすいからです。
-- ビルド対象は `miniruby` と `libruby.<major>.<minor>-static.a` だけです。
+- ビルド対象は `miniruby` と `Makefile` の `LIBRUBY_A`（Linux は
+  `libruby-static.a`、macOS は `libruby.<major>.<minor>-static.a`）だけです。
   拡張ライブラリは C API の実体を持たないので解析に含めません。
 - macOS は Homebrew LLVM の clang を使います。Apple clang の bitcode は LLVM
   ツールで読めますが、環境によって Ruby 本体のビルドが壊れるためです。
 - `-O0` でビルドします。最適化で呼び出しが消えるのを避け、解析を保守的にするためです。
+- HEAD は安定版ではないため、結果は「その時点の master」に対する参考値です。
+  再実行すると commit が変わります。比較には `build.head_sha` を使ってください。
 
 ## 限界
 

@@ -10,18 +10,32 @@
     "no_path": 1,
     "raises": 1
   },
-  "escape_points": ["longjmp", "rb_ec_tag_jump"],
+  "escape_points": [
+    "longjmp",
+    "rb_ec_tag_jump"
+  ],
   "controls_ok": true,
   "controls": [
-    {"name": "rb_ary_push", "reachable": true, "defined": true,
-     "path": ["rb_ary_push", "rb_raise", "rb_exc_raise", "rb_ec_tag_jump", "longjmp"]}
+    {
+      "name": "rb_ary_push",
+      "reachable": true,
+      "defined": true,
+      "path": [
+        "rb_ary_push",
+        "rb_raise",
+        "rb_exc_raise",
+        "rb_ec_tag_jump",
+        "longjmp"
+      ]
+    }
   ],
   "functions": [
     {
       "name": "rb_str_new",
       "header": "ruby/internal/intern/string.h",
       "kind": "external",
-      "status": "no_path"
+      "status": "no_path",
+      "internal": true
     },
     {
       "name": "rb_ary_push",
@@ -29,13 +43,34 @@
       "kind": "external",
       "status": "raises",
       "target": "longjmp",
-      "path": ["rb_ary_push", "rb_raise", "rb_exc_raise", "rb_ec_tag_jump", "longjmp"],
-      "via": ["call", "call", "call", "call", "escape"]
+      "path": [
+        "rb_ary_push",
+        "rb_raise",
+        "rb_exc_raise",
+        "rb_ec_tag_jump",
+        "longjmp"
+      ],
+      "via": [
+        "call",
+        "call",
+        "call",
+        "call",
+        "escape"
+      ],
+      "internal": true
     },
     {
       "name": "rb_array_len",
       "header": "ruby/internal/core/rarray.h",
       "kind": "inline",
+      "status": "no_path",
+      "internal": true
+    },
+    {
+      "name": "rb_fiber_scheduler_get",
+      "header": "ruby/fiber/scheduler.h",
+      "internal": false,
+      "kind": "external",
       "status": "no_path"
     }
   ]

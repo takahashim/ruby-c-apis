@@ -19,10 +19,12 @@ require_relative "fetch"
 ROOT = File.expand_path(__dir__)
 DEFAULT_CONFIGS = "linux-x86_64:ubuntu-24.04,macos-arm64:macos-14"
 
-options = { all: false, releases: nil, configs: DEFAULT_CONFIGS, file: File.join(ROOT, "releases.txt") }
+options = { all: false, head: false, releases: nil, configs: DEFAULT_CONFIGS,
+            file: File.join(ROOT, "releases.txt") }
 OptionParser.new do |opts|
-  opts.banner = "Usage: ruby prepare.rb [--all] [--releases LIST] [--configs LIST]"
-  opts.on("--all", "all stable releases >= 3.3") { options[:all] = true }
+  opts.banner = "Usage: ruby prepare.rb [--all] [--head] [--releases LIST] [--configs LIST]"
+  opts.on("--all", "all stable releases >= 3.3, plus HEAD") { options[:all] = true }
+  opts.on("--head", "include Ruby HEAD") { options[:head] = true }
   opts.on("--releases LIST", "comma-separated versions") { |v| options[:releases] = v }
   opts.on("--configs LIST", "config:runner pairs") { |v| options[:configs] = v }
   opts.on("--file PATH", "release list file") { |v| options[:file] = v }
@@ -33,12 +35,19 @@ versions =
   if options[:releases]
     options[:releases].split(",").map(&:strip).reject(&:empty?)
   elsif options[:all]
-    RaiseSurvey::Fetch.stable_releases
+    RaiseSurvey::Fetch.stable_releases + ["HEAD"]
   else
     File.readlines(options[:file]).map(&:strip).reject { |line| line.empty? || line.start_with?("#") }
   end
+versions << "HEAD" if options[:head]
 
-versions = versions.uniq.sort_by { |v| v.split(".").map(&:to_i) }
+versions = versions.uniq.sort_by do |v|
+  if v.casecmp("HEAD").zero?
+    [1, 0, 0, 0]
+  else
+    [0, *v.split(".").map(&:to_i)]
+  end
+end
 raise "no releases selected" if versions.empty?
 
 configs = options[:configs].split(",").map do |pair|

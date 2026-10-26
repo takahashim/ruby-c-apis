@@ -104,10 +104,13 @@ module RaiseSurvey
         "--disable-yjit",
         "--without-gmp"
       ]
-      # Ruby 4.0 ships ZJIT (Rust).  It is not needed for the C API survey and
-      # makes the build depend on a matching Rust toolchain.
-      major = File.basename(src)[/^ruby-(\d+)\./, 1].to_i
-      configure_args << "--disable-zjit" if major >= 4
+      # Ruby 4.0 ships ZJIT (Rust), and HEAD is 4.1-dev.  It is not needed for
+      # the C API survey and makes the build depend on a matching Rust
+      # toolchain.
+      basename = File.basename(src)
+      head = basename == "ruby-head"
+      major = basename[/^ruby-(\d+)\./, 1].to_i
+      configure_args << "--disable-zjit" if major >= 4 || head
 
       extra = ENV.fetch("RAISE_SURVEY_CONFIGURE_ARGS", "").split
       configure_args.concat(extra)

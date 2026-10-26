@@ -29,7 +29,10 @@ module RaiseSurvey
     }.freeze
 
     def version_key(version)
-      version.split(".").map(&:to_i)
+      value = version.to_s
+      return [1, 0, 0, 0] if value.casecmp("HEAD").zero?
+
+      [0, *value.split(".").map(&:to_i)]
     end
 
     def load_runs(inputs)
@@ -80,8 +83,15 @@ module RaiseSurvey
             "name" => name,
             "header" => fn["header"],
             "kind" => fn["kind"],
+            "internal_seen" => false,
+            "official_seen" => false,
             "results" => {}
           }
+          if fn["internal"]
+            entry["internal_seen"] = true
+          else
+            entry["official_seen"] = true
+          end
           # Prefer a top-level header for display, but keep the declaration
           # from whichever release reported it first.
           if entry["header"].to_s.include?("/internal/") && !fn["header"].to_s.include?("/internal/")
@@ -104,6 +114,15 @@ module RaiseSurvey
           next
         end
 
+        scope =
+          if entry["internal_seen"] && entry["official_seen"]
+            "mixed"
+          elsif entry["internal_seen"]
+            "internal"
+          else
+            "official"
+          end
+
         raise_count = statuses.count("raises")
         no_path_count = statuses.count("no_path")
         not_defined_count = statuses.count("not_defined")
@@ -120,7 +139,10 @@ module RaiseSurvey
             "other"
           end
 
+        entry.delete("internal_seen")
+        entry.delete("official_seen")
         entry.merge(
+          "scope" => scope,
           "overall" => overall,
           "raise_count" => raise_count,
           "no_path_count" => no_path_count,
@@ -159,6 +181,11 @@ module RaiseSurvey
           "no_path_all" => functions.count { |f| f["overall"] == "no_path_all" },
           "raises_any" => functions.count { |f| f["overall"] == "raises_any" },
           "mixed" => functions.count { |f| f["overall"] == "mixed" },
+          "official" => functions.count { |f| f["scope"] == "official" },
+          "internal" => functions.count { |f| f["scope"] == "internal" },
+          "scope_mixed" => functions.count { |f| f["scope"] == "mixed" },
+          "official_no_path_all" => functions.count { |f| f["scope"] == "official" && f["overall"] == "no_path_all" },
+          "internal_no_path_all" => functions.count { |f| f["scope"] == "internal" && f["overall"] == "no_path_all" },
           "controls_ok" => runs.all? { |run| run["controls_ok"] }
         },
         "functions" => functions
@@ -254,7 +281,7 @@ module RaiseSurvey
           .notice.bad { border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); background: var(--bad-weak); }
           .toolbar {
             display: grid;
-            grid-template-columns: minmax(180px, 2fr) repeat(4, minmax(120px, 1fr));
+            grid-template-columns: minmax(180px, 2fr) repeat(5, minmax(110px, 1fr));
             gap: 10px;
             align-items: end;
             background: var(--panel);
@@ -288,6 +315,9 @@ module RaiseSurvey
           .raises_any { color: var(--bad); background: var(--bad-weak); border-color: color-mix(in srgb, var(--bad) 30%, transparent); }
           .mixed { color: var(--warn); background: var(--warn-weak); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
           .other { color: var(--muted); background: var(--bg); border-color: var(--line); }
+          .scope-official { color: var(--accent); background: var(--accent-weak); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+          .scope-internal { color: var(--warn); background: var(--warn-weak); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+          .scope-mixed { color: var(--muted); background: var(--bg); border-color: var(--line); }
           .count { color: var(--muted); font-variant-numeric: tabular-nums; }
           .pager { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 14px; color: var(--muted); font-size: 13px; }
           .pager button { padding: 6px 12px; cursor: pointer; }
@@ -340,6 +370,8 @@ module RaiseSurvey
             <div class="card"><div class="num" id="stat-no-path">—</div><div class="label">全リリースで経路なし</div></div>
             <div class="card"><div class="num" id="stat-raises">—</div><div class="label">1 版以上で raise しうる</div></div>
             <div class="card"><div class="num" id="stat-mixed">—</div><div class="label">一部の版のみ・未調査あり</div></div>
+            <div class="card"><div class="num" id="stat-official">—</div><div class="label">公式ヘッダ（internal 以外）</div></div>
+            <div class="card"><div class="num" id="stat-internal">—</div><div class="label">ruby/internal 配下</div></div>
             <div class="card"><div class="num" id="stat-runs">—</div><div class="label">実行した組</div></div>
           </div>
 
@@ -375,6 +407,14 @@ module RaiseSurvey
                 <option value="inline">static inline</option>
               </select>
             </div>
+            <div>
+              <label for="scope">API 範囲</label>
+              <select id="scope">
+                <option value="">すべて</option>
+                <option value="official">公式ヘッダ</option>
+                <option value="internal">ruby/internal</option>
+              </select>
+            </div>
           </div>
 
           <div class="table-wrap">
@@ -383,6 +423,7 @@ module RaiseSurvey
                 <tr>
                   <th>関数</th>
                   <th>宣言ヘッダ</th>
+                  <th>範囲</th>
                   <th>総合判定</th>
                   <th>raise</th>
                   <th>経路なし</th>
@@ -421,6 +462,7 @@ module RaiseSurvey
                 <li>公開 API はインストール済みヘッダの <code>FunctionDecl</code> から取る。実体のない <code>static inline</code> は、引数をそのまま渡すだけのラッパーを生成して根にする。</li>
                 <li>直接呼び出し、引数として名前を渡された関数（コールバック）、間接呼び出しを辺にする。間接呼び出しは既定で「アドレスを取られた全関数を呼びうる」とみなす。</li>
                 <li>脱出点は <code>longjmp</code> 系（<code>_longjmp</code>、<code>siglongjmp</code>、<code>llvm.eh.sjlj.longjmp</code> を含む）と <code>rb_ec_tag_jump</code>。</li>
+                <li>宣言ヘッダが <code>ruby/internal/</code> 配下なら「internal」、それ以外を「公式ヘッダ」として区別する。同じ関数の宣言が版によって変わる場合は「混在」と表示する。</li>
               </ul>
             </section>
             <section>
@@ -460,7 +502,9 @@ module RaiseSurvey
           const statusLabel = {no_path: '経路なし', raises: 'raise しうる', not_defined: '未定義', unsupported_inline: '未解析'};
           const overallLabel = {no_path_all: '全リリースで経路なし', raises_any: 'raise しうる', mixed: '一部のみ・未調査あり', other: '未分類'};
           const overallClass = {no_path_all: 'no_path_all', raises_any: 'raises_any', mixed: 'mixed', other: 'other'};
-          const state = {q: '', status: '', release: '', config: '', kind: '', page: 1, perPage: 100};
+          const scopeLabel = {official: '公式', internal: 'internal', mixed: '混在'};
+          const scopeClass = {official: 'scope-official', internal: 'scope-internal', mixed: 'scope-mixed'};
+          const state = {q: '', status: '', release: '', config: '', kind: '', scope: '', page: 1, perPage: 100};
           let filtered = [];
 
           const $ = id => document.getElementById(id);
@@ -480,6 +524,8 @@ module RaiseSurvey
           function matches(fn) {
             if (state.kind && fn.kind !== state.kind) return false;
             if (state.status && fn.overall !== state.status) return false;
+            if (state.scope === 'official' && fn.scope !== 'official') return false;
+            if (state.scope === 'internal' && fn.scope === 'official') return false;
             if (state.release || state.config) {
               const rs = state.release ? [state.release] : releases;
               const cs = state.config ? [state.config] : configs;
@@ -513,6 +559,7 @@ module RaiseSurvey
               return `<tr data-name="${esc(fn.name)}">
                 <td class="name"><code>${esc(fn.name)}</code><div class="header">${fn.kind === 'inline' ? 'static inline' : ''}</div></td>
                 <td class="header">${esc(fn.header || '')}</td>
+                <td><span class="badge ${scopeClass[fn.scope] || 'scope-mixed'}">${esc(scopeLabel[fn.scope] || fn.scope || '—')}</span></td>
                 <td><span class="badge ${overallClass[fn.overall] || 'other'}">${esc(overallLabel[fn.overall] || fn.overall)}</span></td>
                 <td class="count">${raise}</td>
                 <td class="count">${noPath}</td>
@@ -534,7 +581,8 @@ module RaiseSurvey
             if (!fn) return;
             $('detail').hidden = false;
             $('detail-name').textContent = fn.name;
-            $('detail-badge').innerHTML = `<span class="badge ${overallClass[fn.overall] || 'other'}">${esc(overallLabel[fn.overall] || fn.overall)}</span>`;
+            $('detail-badge').innerHTML = `<span class="badge ${scopeClass[fn.scope] || 'scope-mixed'}">${esc(scopeLabel[fn.scope] || fn.scope || '—')}</span>
+              <span class="badge ${overallClass[fn.overall] || 'other'}">${esc(overallLabel[fn.overall] || fn.overall)}</span>`;
             $('detail-header').textContent = fn.header || '';
             const head = ['<tr><th>リリース</th>' + configs.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>'];
             $('matrix-head').innerHTML = head.join('');
@@ -565,6 +613,8 @@ module RaiseSurvey
           $('stat-no-path').textContent = fmt(s.no_path_all);
           $('stat-raises').textContent = fmt(s.raises_any);
           $('stat-mixed').textContent = fmt(s.mixed);
+          $('stat-official').textContent = fmt(s.official);
+          $('stat-internal').textContent = fmt(s.internal);
           $('stat-runs').textContent = fmt(s.runs);
 
           const health = [];
@@ -576,6 +626,7 @@ module RaiseSurvey
           const bad = runs.filter(r => !r.controls_ok);
           if (bad.length) health.push(`<div class="notice warn">対照実験が失敗した実行: ${bad.map(r => esc(r.release + ' / ' + r.config)).join(', ')}</div>`);
           if (s.omitted_not_defined) health.push(`<div class="notice">ヘッダにあるが対象ビルドで実体が見つからない関数 ${fmt(s.omitted_not_defined)} 件は表から除外しています。</div>`);
+          if (s.scope_mixed) health.push(`<div class="notice">版によって宣言ヘッダが internal と公式で変わる関数が ${fmt(s.scope_mixed)} 件あります（「混在」）。</div>`);
           const controlRows = runs.map(run => {
             const items = (run.controls || []).map(c => `<code>${esc(c.name)}</code> ${c.reachable ? '✓' : '✗'}`).join(' / ');
             const escapes = (run.escape_points || []).map(e => `<code>${esc(e)}</code>`).join(', ');
@@ -590,6 +641,7 @@ module RaiseSurvey
           $('release').addEventListener('change', e => { state.release = e.target.value; apply(); });
           $('config').addEventListener('change', e => { state.config = e.target.value; apply(); });
           $('kind').addEventListener('change', e => { state.kind = e.target.value; apply(); });
+          $('scope').addEventListener('change', e => { state.scope = e.target.value; apply(); });
           $('prev').addEventListener('click', () => { if (state.page > 1) { state.page--; render(); } });
           $('next').addEventListener('click', () => { if ((state.page * state.perPage) < filtered.length) { state.page++; render(); } });
 

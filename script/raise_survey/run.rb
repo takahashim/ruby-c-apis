@@ -55,7 +55,12 @@ module RaiseSurvey
     end
 
     def release_url(release)
-      "https://github.com/ruby/ruby/tree/v#{release.gsub('.', '_')}"
+      if Fetch.head?(release)
+        sha = `git ls-remote https://github.com/ruby/ruby.git refs/heads/master 2>/dev/null`.split.first
+        sha ? "https://github.com/ruby/ruby/commit/#{sha}" : "https://github.com/ruby/ruby/tree/master"
+      else
+        "https://github.com/ruby/ruby/tree/v#{release.gsub('.', '_')}"
+      end
     end
 
     def run(release:, work:, out:, jobs:, indirect:, config: nil, skip_fetch: false,
@@ -81,6 +86,8 @@ module RaiseSurvey
       meta = {}
       meta["config"] = config
       meta["compiler"] = Build.clang_version(ENV["CCBC_REAL_CC"] || "clang")
+      stamp = File.join(src, ".raise_survey_head_sha")
+      meta["head_sha"] = File.read(stamp).strip if File.file?(stamp)
 
       unless skip_api
         puts "== extract public API"
