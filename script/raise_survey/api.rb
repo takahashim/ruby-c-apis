@@ -73,76 +73,128 @@ module RaiseSurvey
       end
     end
 
-    # clang omits "file" from loc when it is unchanged from the previous
-    # printed node.  Walk the JSON in document order and remember it.
-    def extract_functions(ast)
-      current_file = nil
-      functions = {}
+    # clang's JSON dump omits "file" from loc when it is unchanged from the
+    # previously printed node.  After returning from an #include, the next
+    # declaration can therefore be attributed to the system header that was
+    # included last (this is why rb_errno was missing on macOS).  Dumping with
+    # -ast-dump-filter resets that state for every matched declaration, and
+    # produces one JSON object per declaration instead of one huge array.
+    FILTERS = %w[rb_ ruby_ st_ onig].freeze
+    PUBLIC_PREFIXES = /\A(?:rb_|ruby_|st_|onig)/
 
-      walk = lambda do |node|
-        return unless node.is_a?(Hash)
+    def each_ast_object(path)
+      return unless File.file?(path)
 
-        loc = node["loc"]
-        if loc.is_a?(Hash)
-          current_file = loc["file"] if loc["file"]
-          current_file = loc.dig("expansionLoc", "file") if loc.dig("expansionLoc", "file")
-          current_file = loc.dig("spellingLoc", "file") if loc.dig("spellingLoc", "file")
-        end
+      depth = 0
+      in_string = false
+      escaped = false
+      buffer = +""
 
-        if node["kind"] == "FunctionDecl"
-          name = node["name"].to_s
-          if name.match?(/\A(?:rb_|ruby_)/)
-            begin_loc = node.dig("range", "begin") || {}
-            file = begin_loc.dig("expansionLoc", "file") ||
-                   begin_loc.dig("spellingLoc", "file") ||
-                   current_file
-            header = normalize_header(file)
-            if header
-              inner = node["inner"] || []
-              has_body = inner.any? { |child| child["kind"] == "CompoundStmt" }
-              storage = node["storageClass"]
-              inline = has_body && (storage == "static" || node["inline"] == true || storage.nil?)
+      File.open(path, "r:UTF-8") do |file|
+        file.each_char do |char|
+          if depth.zero?
+            next unless char == "{"
 
-              # static declarations without a body are the ANYARGS dispatch
-              # placeholders in anyargs.h; they are never defined.
-              unless storage == "static" && !has_body
-                params = inner.select { |child| child["kind"] == "ParmVarDecl" }.each_with_index.map do |param, index|
-                  {
-                    "name" => param["name"].to_s.empty? ? "p#{index}" : param["name"],
-                    "type" => param.dig("type", "qualType").to_s
-                  }
-                end
+            depth = 1
+            buffer = +"{"
+            in_string = false
+            escaped = false
+            next
+          end
 
-                qual = node.dig("type", "qualType").to_s
-                variadic = node["variadic"] == true || qual.match?(/,\s*\.\.\.\)/) || qual.end_with?("(...)")
-
-                candidate = {
-                  "name" => name,
-                  "header" => header,
-                  "internal" => header.start_with?("ruby/internal/"),
-                  "kind" => inline ? "inline" : "external",
-                  "return_type" => function_return_type(qual),
-                  "params" => params,
-                  "variadic" => variadic
-                }
-
-                existing = functions[name]
-                # Prefer an inline definition over a plain declaration, and a
-                # top-level header over an internal one for display.
-                if existing.nil? ||
-                   (existing["kind"] == "external" && candidate["kind"] == "inline") ||
-                   (existing["header"].include?("/internal/") && !candidate["header"].include?("/internal/"))
-                  functions[name] = candidate
-                end
-              end
+          buffer << char
+          if in_string
+            if escaped
+              escaped = false
+            elsif char == "\\"
+              escaped = true
+            elsif char == '"'
+              in_string = false
+            end
+          elsif char == '"'
+            in_string = true
+          elsif char == "{"
+            depth += 1
+          elsif char == "}"
+            depth -= 1
+            if depth.zero?
+              yield JSON.parse(buffer)
+              buffer = +""
             end
           end
         end
+      end
+    end
 
-        (node["inner"] || []).each { |child| walk.call(child) }
+    def declaration_file(node)
+      loc = node["loc"] || {}
+      begin_loc = node.dig("range", "begin") || {}
+      begin_loc.dig("expansionLoc", "file") ||
+        begin_loc.dig("spellingLoc", "file") ||
+        loc["file"] ||
+        loc.dig("expansionLoc", "file") ||
+        loc.dig("spellingLoc", "file")
+    end
+
+    def function_candidate(node)
+      name = node["name"].to_s
+      return nil unless name.match?(PUBLIC_PREFIXES)
+
+      header = normalize_header(declaration_file(node))
+      return nil unless header
+
+      inner = node["inner"] || []
+      has_body = inner.any? { |child| child["kind"] == "CompoundStmt" }
+      storage = node["storageClass"]
+      inline = has_body && (storage == "static" || node["inline"] == true || storage.nil?)
+
+      # static declarations without a body are the ANYARGS dispatch
+      # placeholders in anyargs.h; they are never defined.
+      return nil if storage == "static" && !has_body
+
+      params = inner.select { |child| child["kind"] == "ParmVarDecl" }.each_with_index.map do |param, index|
+        {
+          "name" => param["name"].to_s.empty? ? "p#{index}" : param["name"],
+          "type" => param.dig("type", "qualType").to_s
+        }
       end
 
-      walk.call(ast)
+      qual = node.dig("type", "qualType").to_s
+      variadic = node["variadic"] == true || qual.match?(/,\s*\.\.\.\)/) || qual.end_with?("(...)")
+
+      {
+        "name" => name,
+        "header" => header,
+        "internal" => header.start_with?("ruby/internal/"),
+        "kind" => inline ? "inline" : "external",
+        "return_type" => function_return_type(qual),
+        "params" => params,
+        "variadic" => variadic
+      }
+    end
+
+    def extract_functions(ast_paths)
+      functions = {}
+
+      ast_paths.each do |path|
+        each_ast_object(path) do |node|
+          next unless node["kind"] == "FunctionDecl"
+
+          candidate = function_candidate(node)
+          next unless candidate
+
+          name = candidate["name"]
+          existing = functions[name]
+          # Prefer an inline definition over a plain declaration, and a
+          # top-level header over an internal one for display.
+          if existing.nil? ||
+             (existing["kind"] == "external" && candidate["kind"] == "inline") ||
+             (existing["header"].include?("/internal/") && !candidate["header"].include?("/internal/"))
+            functions[name] = candidate
+          end
+        end
+      end
+
       functions.values.sort_by { |f| f["name"] }
     end
 
@@ -212,9 +264,11 @@ module RaiseSurvey
       [(undefs + wrappers).join("\n"), skipped]
     end
 
-    def ast_json(clang, source, include_args, out)
+    def ast_json(clang, source, include_args, out, filter: nil)
       cmd = [clang, "-x", "c", "-std=gnu11", "-fsyntax-only", *include_args,
-             "-Xclang", "-ast-dump=json", source]
+             "-Xclang", "-ast-dump=json"]
+      cmd.concat(["-Xclang", "-ast-dump-filter=#{filter}"]) if filter
+      cmd << source
       puts "+ #{cmd.shelljoin}" if ENV["RAISE_SURVEY_VERBOSE"] == "1"
       File.open(out, "w") do |io|
         ok = system(*cmd, out: io, err: $stderr)
@@ -262,12 +316,14 @@ if $PROGRAM_NAME == __FILE__
   File.write(umbrella, RaiseSurvey::API.umbrella_source(include_dir))
 
   include_args = ["-I", include_dir] + arch_dirs.flat_map { |dir| ["-I", dir] }
-  ast_path = File.join(options[:out], "ast.json")
-  RaiseSurvey::API.ast_json(options[:clang], umbrella, include_args, ast_path)
+  ast_paths = RaiseSurvey::API::FILTERS.map do |filter|
+    path = File.join(options[:out], "ast-#{filter.delete('_')}.json")
+    RaiseSurvey::API.ast_json(options[:clang], umbrella, include_args, path, filter: filter)
+    path
+  end
 
-  ast = JSON.parse(File.read(ast_path))
-  functions = RaiseSurvey::API.extract_functions(ast)
-  File.delete(ast_path) unless options[:keep_ast]
+  functions = RaiseSurvey::API.extract_functions(ast_paths)
+  ast_paths.each { |path| File.delete(path) } unless options[:keep_ast]
 
   wrappers, skipped = RaiseSurvey::API.wrapper_source(functions)
   skipped_names = skipped.map(&:first).to_h { |name| [name, true] }

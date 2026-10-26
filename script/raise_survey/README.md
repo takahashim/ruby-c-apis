@@ -156,7 +156,8 @@ HTML の表では、全実行で `no_path` のものを「全リリースで経�
 
 ### 根（公開 API）
 
-ヘッダの `FunctionDecl` から `rb_` / `ruby_` で始まる関数を取ります。
+ヘッダの `FunctionDecl` から `rb_` / `ruby_` / `st_` / `onig` の名前空間の関数を取ります。
+（`st_*` の多くは `rb_st_*` へのマクロなので、実体の宣言名で拾われます。）
 `static inline` は実体がライブラリにないため、次のようなラッパーを生成します。
 
 ```c
@@ -168,6 +169,11 @@ long survey_inline_rb_array_len(VALUE p0) {
 
 ラッパーは実行しません。呼び出しグラフの根としてだけ使います。可変長引数など、
 そのまま転送できない関数は `unsupported_inline` になります。
+
+clang の AST JSON は、直前と同じファイルなら `loc.file` を省略します。システム
+ヘッダを `#include` した直後の宣言（macOS の `rb_errno` など）がシステムヘッダに
+帰属して消えるのを避けるため、`-ast-dump-filter` を名前空間ごとに指定し、宣言ごとに
+完全な location を出させています。
 
 ### 辺
 
