@@ -4,7 +4,7 @@ English: [spec.md](spec.md)
 
 ## 目的
 
-- CRuby の公開 C API の各関数が `longjmp`（raise）に到達しうるかを判定する。
+- CRuby の公開 C API の各関数が `longjmp`（raise）に到達しうるかを判定し、その情報を提供する。
 - 「raise しない」は、どの引数でも、調べた全リリース・全構成で脱出点への経路がないこと。
 - 条件付きで安全な関数は「raise しうる」に分類する。
 

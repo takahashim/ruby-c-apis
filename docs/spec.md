@@ -4,7 +4,7 @@ Japanese: [spec.ja.md](spec.ja.md)
 
 ## Goal
 
-- For each public CRuby C API function, decide whether it can reach a `longjmp` (i.e. raise).
+- Determine whether each public CRuby C API function can reach a `longjmp` (i.e. raise), and provide that information.
 - "Does not raise" means: no path to an escape point for any arguments, in every surveyed release and config.
 - Conditionally safe functions are reported as "can raise".
 
