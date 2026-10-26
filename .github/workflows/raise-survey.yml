@@ -1,0 +1,190 @@
+name: raise-survey
+
+on:
+  workflow_dispatch:
+    inputs:
+      releases:
+        description: "カンマ区切りの Ruby バージョン（空なら releases.txt）"
+        required: false
+        default: ""
+      all_releases:
+        description: "3.3 以降の全安定版を調査する"
+        type: boolean
+        default: false
+      indirect:
+        description: "間接呼び出しの扱い"
+        type: choice
+        options: [any, typed]
+        default: any
+  push:
+    branches: [main]
+    paths:
+      - "script/raise_survey/**"
+      - ".github/workflows/raise-survey.yml"
+      - "notes/raise_survey_plan.ja.md"
+  schedule:
+    - cron: "0 3 1 * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: raise-survey-pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: false
+      - name: Syntax check
+        run: |
+          for file in script/raise_survey/*.rb; do ruby -c "$file"; done
+          python3 -m py_compile script/raise_survey/analyze.py
+      - name: Report generator smoke test
+        run: |
+          ruby script/raise_survey/survey.rb --inputs script/raise_survey/test/fixtures --out "$RUNNER_TEMP/site" --generated-at 2026-10-26T00:00:00Z
+          test -s "$RUNNER_TEMP/site/index.html"
+          test -s "$RUNNER_TEMP/site/data.json"
+
+  prepare:
+    runs-on: ubuntu-24.04
+    needs: test
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: false
+      - id: matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RELEASES: ${{ inputs.releases }}
+          INPUT_ALL: ${{ inputs.all_releases }}
+        run: |
+          args=()
+          if [ "$EVENT_NAME" = "schedule" ] || [ "$INPUT_ALL" = "true" ]; then
+            args+=(--all)
+          fi
+          if [ -n "$INPUT_RELEASES" ]; then
+            args+=(--releases "$INPUT_RELEASES")
+          fi
+          ruby script/raise_survey/prepare.rb "${args[@]}" > "$RUNNER_TEMP/matrix.json"
+          echo "matrix=$(cat "$RUNNER_TEMP/matrix.json")" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/matrix.json"
+
+  survey:
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: false
+
+      - name: Install build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang llvm libssl-dev zlib1g-dev libyaml-dev \
+            libreadline-dev libffi-dev libgdbm-dev libncurses-dev bison
+          llvm_bin="$(dirname "$(find /usr/lib/llvm-*/bin/llvm-link | sort -V | tail -1)")"
+          echo "$llvm_bin" >> "$GITHUB_PATH"
+
+      - name: Install build dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install llvm
+          llvm_prefix="$(brew --prefix llvm)"
+          echo "$llvm_prefix/bin" >> "$GITHUB_PATH"
+          echo "CCBC_REAL_CC=$llvm_prefix/bin/clang" >> "$GITHUB_ENV"
+
+      - name: Cache downloaded source
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/raise-survey/work/cache
+          key: raise-survey-src-${{ matrix.release }}-${{ hashFiles('script/raise_survey/fetch.rb') }}
+
+      - name: Build and analyze
+        env:
+          INDIRECT: ${{ inputs.indirect || 'any' }}
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            jobs="$(sysctl -n hw.ncpu)"
+          else
+            jobs="$(nproc)"
+          fi
+          ruby script/raise_survey/run.rb \
+            --release "${{ matrix.release }}" \
+            --config "${{ matrix.config }}" \
+            --work "$RUNNER_TEMP/raise-survey/work" \
+            --out "$RUNNER_TEMP/raise-survey/out" \
+            --jobs "$jobs" \
+            --indirect "$INDIRECT"
+
+      - name: Upload survey JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: survey-${{ matrix.release }}-${{ matrix.config }}
+          path: ${{ runner.temp }}/raise-survey/out/*.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: survey
+    if: always() && (needs.survey.result == 'success' || needs.survey.result == 'failure')
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: false
+
+      - name: Prepare output directory
+        run: mkdir -p "$RUNNER_TEMP/raise-survey/out"
+
+      - name: Download survey JSON
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: survey-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/raise-survey/out
+
+      - name: Generate HTML
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          ruby script/raise_survey/survey.rb \
+            --inputs "$RUNNER_TEMP/raise-survey/out" \
+            --out "$RUNNER_TEMP/raise-survey/site" \
+            --commit "$GITHUB_SHA" \
+            --repo-url "https://github.com/$GITHUB_REPOSITORY"
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/raise-survey/site
+      - id: deployment
+        uses: actions/deploy-pages@v4

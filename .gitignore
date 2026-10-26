@@ -1,0 +1,6 @@
+/work*/
+/out/
+/site/
+__pycache__/
+*.pyc
+.DS_Store

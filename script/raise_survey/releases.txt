@@ -1,0 +1,5 @@
+# Releases used by push / workflow_dispatch.
+# Leave the trial set here and pass --all (or set all_releases) for a full run.
+3.3.0
+3.4.9
+4.0.9
