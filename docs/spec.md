@@ -13,7 +13,7 @@ Japanese: [spec.ja.md](spec.ja.md)
 - Releases: stable releases from 3.3.0 on, plus Ruby HEAD. No previews or RCs. Default set: `script/raise_survey/releases.txt`.
 - Configs: `linux-x86_64`, `macos-arm64`. Built with `-O0`.
 - Public API: functions declared by the headers in `include/` under the `rb_` / `ruby_` / `st_` / `onig` namespaces.
-  - `scope: official` — declared outside `ruby/internal/`; `internal` — under it; `mixed` — differs by release.
+  - Headers under `ruby/internal/` are included: they are installed and part of the public API.
   - Macros are not listed; the functions they expand to are.
   - `static inline` functions get a generated forwarding wrapper that serves as the root of the call graph.
 

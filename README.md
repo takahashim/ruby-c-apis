@@ -9,8 +9,6 @@ Finds which public CRuby C API functions can raise (longjmp), by walking the cal
 
 [![raise-survey](https://github.com/takahashim/ruby-c-apis/actions/workflows/raise-survey.yml/badge.svg)](https://github.com/takahashim/ruby-c-apis/actions/workflows/raise-survey.yml)
 
-Each function is marked `official` (declared outside `ruby/internal/`) or `internal` (under `ruby/internal/`).
-
 ## Usage
 
 ```sh

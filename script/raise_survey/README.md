@@ -42,7 +42,7 @@ ruby script/raise_survey/survey.rb --inputs out --out site --repo-url https://gi
 ```json
 {
   "name": "rb_array_len", "header": "ruby/internal/core/rarray.h",
-  "internal": true, "kind": "inline", "scope": "internal",
+  "kind": "inline",
   "results": { "3.4.12|macos-arm64|any": { "status": "no_path" } },
   "overall": "no_path_all", "raise_count": 0, "no_path_count": 2, "unanalyzed_count": 0
 }

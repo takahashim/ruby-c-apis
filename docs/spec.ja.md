@@ -13,7 +13,7 @@ English: [spec.md](spec.md)
 - リリース: 3.3.0 以降の安定版と Ruby HEAD。プレリリースは除く。既定は `script/raise_survey/releases.txt`。
 - 構成: `linux-x86_64`、`macos-arm64`。`-O0` でビルドする。
 - 公開 API: `include/` のヘッダが宣言する `rb_` / `ruby_` / `st_` / `onig` の関数。
-  - `scope: official` は `ruby/internal/` 以外、`internal` は配下、`mixed` は版で異なる。
+  - `ruby/internal/` 配下のヘッダも含める。インストールされる公開 API である。
   - マクロは列挙せず、展開先の関数を調べる。
   - `static inline` は、転送するだけのラッパーを生成して根にする。
 

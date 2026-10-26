@@ -757,7 +757,6 @@ def main() -> int:
         name = fn["name"]
         kind = fn["kind"]
         wrapper = fn.get("wrapper")
-        internal = bool(fn.get("internal"))
 
         if kind == "inline":
             root = wrapper
@@ -765,7 +764,6 @@ def main() -> int:
                 funcs.append({
                     "name": name,
                     "header": fn["header"],
-                    "internal": internal,
                     "kind": kind,
                     "status": "unsupported_inline",
                 })
@@ -777,7 +775,6 @@ def main() -> int:
                 funcs.append({
                     "name": name,
                     "header": fn["header"],
-                    "internal": internal,
                     "kind": kind,
                     "status": "not_defined",
                 })
@@ -789,7 +786,6 @@ def main() -> int:
             funcs.append({
                 "name": name,
                 "header": fn["header"],
-                "internal": internal,
                 "kind": kind,
                 "status": "no_path",
             })
@@ -806,7 +802,6 @@ def main() -> int:
             funcs.append({
                 "name": name,
                 "header": fn["header"],
-                "internal": internal,
                 "kind": kind,
                 "status": "raises",
                 "target": target,

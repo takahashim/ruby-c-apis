@@ -165,7 +165,6 @@ module RaiseSurvey
       {
         "name" => name,
         "header" => header,
-        "internal" => header.start_with?("ruby/internal/"),
         "kind" => inline ? "inline" : "external",
         "return_type" => function_return_type(qual),
         "params" => params,
@@ -350,8 +349,6 @@ if $PROGRAM_NAME == __FILE__
     "skipped_inline" => skipped.map { |name, reason| { "name" => name, "reason" => reason } },
     "stats" => {
       "functions" => functions.length,
-      "official" => functions.count { |f| !f["internal"] },
-      "internal" => functions.count { |f| f["internal"] },
       "external" => functions.count { |f| f["kind"] == "external" },
       "inline" => functions.count { |f| f["kind"] == "inline" },
       "wrappers" => wrappers.scan(/__attribute__\(\(noinline, used\)\)/).length,
