@@ -6,7 +6,10 @@ CRuby の公開 C API が raise（longjmp）しうるかを、LLVM IR の呼び�
 
 - ツール本体: [`script/raise_survey/`](script/raise_survey/)
 - GitHub Actions: [`.github/workflows/raise-survey.yml`](.github/workflows/raise-survey.yml)
-- 公開ページ: GitHub Pages（`https://OWNER.github.io/REPO/`）
+- 公開ページ: <https://takahashim.github.io/ruby-c-apis/>
+- 解析結果 JSON: <https://takahashim.github.io/ruby-c-apis/data.json>
+
+[![raise-survey](https://github.com/takahashim/ruby-c-apis/actions/workflows/raise-survey.yml/badge.svg)](https://github.com/takahashim/ruby-c-apis/actions/workflows/raise-survey.yml)
 
 ## 使い方
 
