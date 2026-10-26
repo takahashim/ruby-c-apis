@@ -168,6 +168,8 @@ module RaiseSurvey
             "config" => run["config"],
             "indirect" => run["indirect"] || "any",
             "generated_at" => run["generated_at"],
+            "source_url" => run["source_url"],
+            "head_sha" => run.dig("build", "head_sha"),
             "stats" => run["stats"],
             "escape_points" => run["escape_points"],
             "controls_ok" => run["controls_ok"],
@@ -630,7 +632,8 @@ module RaiseSurvey
           const controlRows = runs.map(run => {
             const items = (run.controls || []).map(c => `<code>${esc(c.name)}</code> ${c.reachable ? '✓' : '✗'}`).join(' / ');
             const escapes = (run.escape_points || []).map(e => `<code>${esc(e)}</code>`).join(', ');
-            return `<li><strong>${esc(run.release)} / ${esc(run.config)}</strong>: ${items || '<span class="muted">データなし</span>'}<div class="muted">脱出点: ${escapes || '—'}</div></li>`;
+            const head = run.head_sha ? ` <span class="muted">HEAD ${esc(String(run.head_sha).slice(0, 12))}</span>` : '';
+            return `<li><strong>${esc(run.release)} / ${esc(run.config)}</strong>${head}: ${items || '<span class="muted">データなし</span>'}<div class="muted">脱出点: ${escapes || '—'}</div></li>`;
           }).join('');
           health.push(`<details class="notice"><summary>対照実験と脱出点（${runs.length} 実行）</summary><ul>${controlRows}</ul></details>`);
           $('health').innerHTML = health.join('');
