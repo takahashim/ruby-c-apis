@@ -22,10 +22,10 @@ module RaiseSurvey
     module_function
 
     STATUS_LABELS = {
-      "no_path" => "経路なし",
-      "raises" => "raise しうる",
-      "not_defined" => "未定義",
-      "unsupported_inline" => "未解析 (inline)"
+      "no_path" => "No path",
+      "raises" => "Can raise",
+      "not_defined" => "Not defined",
+      "unsupported_inline" => "Not analyzed (inline)"
     }.freeze
 
     def version_key(version)
@@ -189,7 +189,7 @@ module RaiseSurvey
 
       <<~HTML
         <!doctype html>
-        <html lang="ja">
+        <html lang="en">
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -325,57 +325,57 @@ module RaiseSurvey
         <body>
         <header class="hero">
           <div class="wrap">
-            <h1>CRuby C API: raise する関数の調査</h1>
+            <h1>CRuby C API raise survey</h1>
             <p class="lead">
-              CRuby の公開 C API のうち、どの安定版でも longjmp（raise）に到達しない関数を、
-              LLVM IR の呼び出しグラフから機械的に求めます。条件付きで安全な関数は含めません。
+              Which public CRuby C API functions can reach a longjmp (i.e. raise), found mechanically
+              from the call graph of LLVM IR. Conditionally safe functions count as "can raise".
             </p>
             <div class="meta">
-              <span>生成: #{h(generated)}</span>
+              <span>Generated: #{h(generated)}</span>
               <span>commit: <code>#{h(commit)}</code></span>
-              <span>実行: #{run_count} 組（release × config）</span>
-              #{repo.empty? ? "" : "<span><a href=\"#{h(repo)}\">リポジトリ</a></span>"}
+              <span>Runs: #{run_count} (release × config)</span>
+              #{repo.empty? ? "" : "<span><a href=\"#{h(repo)}\">Repository</a></span>"}
               <span><a href="data.json">data.json</a></span>
             </div>
           </div>
         </header>
         <main class="wrap">
           <div class="cards">
-            <div class="card"><div class="num" id="stat-functions">—</div><div class="label">調査対象の関数</div></div>
-            <div class="card"><div class="num" id="stat-no-path">—</div><div class="label">全リリースで経路なし</div></div>
-            <div class="card"><div class="num" id="stat-raises">—</div><div class="label">1 版以上で raise しうる</div></div>
-            <div class="card"><div class="num" id="stat-mixed">—</div><div class="label">一部の版のみ・未調査あり</div></div>
-            <div class="card"><div class="num" id="stat-runs">—</div><div class="label">実行した組</div></div>
+            <div class="card"><div class="num" id="stat-functions">—</div><div class="label">Functions surveyed</div></div>
+            <div class="card"><div class="num" id="stat-no-path">—</div><div class="label">No path in every release</div></div>
+            <div class="card"><div class="num" id="stat-raises">—</div><div class="label">Can raise in at least one release</div></div>
+            <div class="card"><div class="num" id="stat-mixed">—</div><div class="label">Partial or not analyzed</div></div>
+            <div class="card"><div class="num" id="stat-runs">—</div><div class="label">Runs</div></div>
           </div>
 
           <div id="health"></div>
 
           <div class="toolbar">
             <div class="search">
-              <label for="q">関数名・ヘッダで検索</label>
-              <input id="q" type="search" placeholder="例: rb_str_new, rb_ary" autocomplete="off">
+              <label for="q">Search by function name or header</label>
+              <input id="q" type="search" placeholder="e.g. rb_str_new, rb_ary" autocomplete="off">
             </div>
             <div>
-              <label for="status">判定</label>
+              <label for="status">Result</label>
               <select id="status">
-                <option value="">すべて</option>
-                <option value="no_path_all">全リリースで経路なし</option>
-                <option value="raises_any">1 版以上で raise</option>
-                <option value="mixed">一部の版のみ・未調査あり</option>
+                <option value="">All</option>
+                <option value="no_path_all">No path in every release</option>
+                <option value="raises_any">Can raise</option>
+                <option value="mixed">Partial or not analyzed</option>
               </select>
             </div>
             <div>
-              <label for="release">リリース</label>
-              <select id="release"><option value="">すべて</option>#{release_options}</select>
+              <label for="release">Release</label>
+              <select id="release"><option value="">All</option>#{release_options}</select>
             </div>
             <div>
-              <label for="config">構成</label>
-              <select id="config"><option value="">すべて</option>#{config_options}</select>
+              <label for="config">Config</label>
+              <select id="config"><option value="">All</option>#{config_options}</select>
             </div>
             <div>
-              <label for="kind">種別</label>
+              <label for="kind">Kind</label>
               <select id="kind">
-                <option value="">すべて</option>
+                <option value="">All</option>
                 <option value="external">external</option>
                 <option value="inline">static inline</option>
               </select>
@@ -386,12 +386,12 @@ module RaiseSurvey
             <table>
               <thead>
                 <tr>
-                  <th>関数</th>
-                  <th>宣言ヘッダ</th>
-                  <th>総合判定</th>
+                  <th>Function</th>
+                  <th>Header</th>
+                  <th>Result</th>
                   <th>raise</th>
-                  <th>経路なし</th>
-                  <th>未調査</th>
+                  <th>No path</th>
+                  <th>Not analyzed</th>
                 </tr>
               </thead>
               <tbody id="rows"></tbody>
@@ -399,8 +399,8 @@ module RaiseSurvey
             <div class="pager">
               <span id="page-info">—</span>
               <span>
-                <button id="prev" type="button">前へ</button>
-                <button id="next" type="button">次へ</button>
+                <button id="prev" type="button">Previous</button>
+                <button id="next" type="button">Next</button>
               </span>
             </div>
           </div>
@@ -413,41 +413,41 @@ module RaiseSurvey
             <div class="muted"><span id="detail-header"></span></div>
             <div class="matrix"><table><thead id="matrix-head"></thead><tbody id="matrix-body"></tbody></table></div>
             <div class="witness">
-              <h3>経路の例</h3>
+              <h3>Example paths</h3>
               <ul id="witness"></ul>
             </div>
           </section>
 
           <div class="method">
             <section>
-              <h2>方法</h2>
+              <h2>Method</h2>
               <ul>
-                <li>各リリースを <code>clang -emit-llvm</code> でビルドし、<code>libruby-static.a</code> のオブジェクトから作った IR を <code>llvm-link</code> で結合する。</li>
-                <li>公開 API はインストール済みヘッダの <code>FunctionDecl</code> から取る。実体のない <code>static inline</code> は、引数をそのまま渡すだけのラッパーを生成して根にする。</li>
-                <li>直接呼び出し、引数として名前を渡された関数（コールバック）、間接呼び出しを辺にする。間接呼び出しは既定で「アドレスを取られた全関数を呼びうる」とみなす。</li>
-                <li>脱出点は <code>longjmp</code> 系（<code>_longjmp</code>、<code>siglongjmp</code>、<code>llvm.eh.sjlj.longjmp</code> を含む）と <code>rb_ec_tag_jump</code>。</li>
+                <li>Each release is built with <code>clang -emit-llvm</code>; the IR of the <code>libruby-static.a</code> objects is combined with <code>llvm-link</code>.</li>
+                <li>The public API comes from the <code>FunctionDecl</code>s of the installed headers. A <code>static inline</code> function has no body in the library, so a wrapper that forwards its arguments is generated and used as the root.</li>
+                <li>Call relations are direct calls, functions passed by name as arguments (callbacks), and indirect calls. By default an indirect call may call any address-taken function.</li>
+                <li>Escape points are the <code>longjmp</code> family (including <code>_longjmp</code>, <code>siglongjmp</code>, <code>llvm.eh.sjlj.longjmp</code>) and <code>rb_ec_tag_jump</code>.</li>
               </ul>
             </section>
             <section>
-              <h2>「raise しない」の意味</h2>
+              <h2>What "does not raise" means</h2>
               <ul>
-                <li>「何を渡されても raise しない」だけを安全側に数える。引数の値を区別しないため、クラスでない値のときだけ raise する関数は「raise しうる」になる。</li>
-                <li>経路がないことは、そのビルドのコードについてだけ言える。拡張が登録するコールバックや <code>dlopen</code> で後から読み込まれるコードは含まない。</li>
-                <li>構成（OS、configure オプション）でコードも longjmp の名前も変わる。版と構成の積集合を安全とみなす。</li>
+                <li>Only "does not raise for any arguments" counts. A function that raises only for some argument values is reported as "can raise".</li>
+                <li>No path holds only for the analyzed build. Extension callbacks and code loaded later with <code>dlopen</code> are not covered.</li>
+                <li>Code and longjmp names differ by config (OS, configure options). A function is safe only if it has no path in every release and config.</li>
               </ul>
             </section>
             <section>
-              <h2>既知の限界</h2>
+              <h2>Known limits</h2>
               <ul>
-                <li>解析は条件分岐や引数の値を追わない。偽陽性（実際には到達しない経路）を含む。</li>
-                <li>確保に伴う <code>NoMemoryError</code> はヘッダの doc コメントにほとんど書かれない。この解析はその点を補うが、外部ライブラリの中身は対象外。</li>
-                <li>「raise しうる」は人が理由を確認する候補であり、<code>NON_RAISING</code> に載せるには経路の確認が必要。</li>
+                <li>Only constant integer arguments and the branches they decide are tracked, so false positives (paths that cannot happen) remain.</li>
+                <li><code>NoMemoryError</code> from allocation is rarely documented in headers. This analysis covers it, but not the inside of external libraries.</li>
+                <li>"Can raise" is a candidate to be checked by reading the path; it may be a false positive.</li>
               </ul>
             </section>
           </div>
         </main>
         <footer class="wrap">
-          <p>このページは <code>script/raise_survey/</code> の結果から生成しています。解析結果は <a href="data.json">data.json</a> から取得できます。</p>
+          <p>This page is generated from the results of <code>script/raise_survey/</code>. The data is available as <a href="data.json">data.json</a>.</p>
         </footer>
         <script id="survey-data" type="application/json">#{json}</script>
         <script>
@@ -462,15 +462,15 @@ module RaiseSurvey
           }
           const releases = data.releases;
           const configs = data.configs;
-          const statusLabel = {no_path: '経路なし', raises: 'raise しうる', not_defined: '未定義', unsupported_inline: '未解析'};
-          const overallLabel = {no_path_all: '全リリースで経路なし', raises_any: 'raise しうる', mixed: '一部のみ・未調査あり', other: '未分類'};
+          const statusLabel = {no_path: 'No path', raises: 'Can raise', not_defined: 'Not defined', unsupported_inline: 'Not analyzed'};
+          const overallLabel = {no_path_all: 'No path in every release', raises_any: 'Can raise', mixed: 'Partial or not analyzed', other: 'Other'};
           const overallClass = {no_path_all: 'no_path_all', raises_any: 'raises_any', mixed: 'mixed', other: 'other'};
           const state = {q: '', status: '', release: '', config: '', kind: '', page: 1, perPage: 100};
           let filtered = [];
 
           const $ = id => document.getElementById(id);
           const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-          const fmt = n => new Intl.NumberFormat('ja-JP').format(n ?? 0);
+          const fmt = n => new Intl.NumberFormat('en-US').format(n ?? 0);
 
           function resultFor(fn, release, config) {
             const run = runByPair[`${release}|${config}`];
@@ -526,7 +526,7 @@ module RaiseSurvey
             }).join('');
             const total = filtered.length;
             const pages = Math.max(1, Math.ceil(total / state.perPage));
-            $('page-info').textContent = `${fmt(total)} 件中 ${total ? start + 1 : 0}–${Math.min(start + state.perPage, total)} 件（${state.page} / ${pages} ページ）`;
+            $('page-info').textContent = `${total ? start + 1 : 0}–${Math.min(start + state.perPage, total)} of ${fmt(total)} (page ${state.page} / ${pages})`;
             $('prev').disabled = state.page <= 1;
             $('next').disabled = state.page >= pages;
             for (const tr of document.querySelectorAll('#rows tr')) {
@@ -541,7 +541,7 @@ module RaiseSurvey
             $('detail-name').textContent = fn.name;
             $('detail-badge').innerHTML = `<span class="badge ${overallClass[fn.overall] || 'other'}">${esc(overallLabel[fn.overall] || fn.overall)}</span>`;
             $('detail-header').textContent = fn.header || '';
-            const head = ['<tr><th>リリース</th>' + configs.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>'];
+            const head = ['<tr><th>Release</th>' + configs.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>'];
             $('matrix-head').innerHTML = head.join('');
             $('matrix-body').innerHTML = releases.map(rel => {
               const cells = configs.map(cfg => {
@@ -560,7 +560,7 @@ module RaiseSurvey
               const [rel, cfg] = key.split('|');
               witnesses.push(`<li><code>${esc(rel)} / ${esc(cfg)}</code><span class="path">${esc((result.path || []).join(' → '))}</span></li>`);
             }
-            $('witness').innerHTML = witnesses.length ? witnesses.join('') : '<li class="muted">raise に至る経路は見つかっていません。</li>';
+            $('witness').innerHTML = witnesses.length ? witnesses.join('') : '<li class="muted">No path to a raise was found.</li>';
             $('detail').scrollIntoView({behavior: 'smooth', block: 'start'});
           }
 
@@ -574,20 +574,20 @@ module RaiseSurvey
 
           const health = [];
           if (!s.controls_ok) {
-            health.push('<div class="notice bad"><strong>到達可能性の対照実験に失敗しました。</strong> raise が既知の関数が経路ありと判定されていません。解析結果を信用する前にビルドログを確認してください。</div>');
+            health.push('<div class="notice bad"><strong>The reachability control failed.</strong> Functions known to raise were not found to have a path. Check the build logs before trusting the results.</div>');
           } else {
-            health.push('<div class="notice">到達可能性の対照実験: 既知の raise 関数はすべて経路ありと判定されました。</div>');
+            health.push('<div class="notice">Reachability control: every function known to raise has a path.</div>');
           }
           const bad = runs.filter(r => !r.controls_ok);
-          if (bad.length) health.push(`<div class="notice warn">対照実験が失敗した実行: ${bad.map(r => esc(r.release + ' / ' + r.config)).join(', ')}</div>`);
-          if (s.omitted_not_defined) health.push(`<div class="notice">ヘッダにあるが対象ビルドで実体が見つからない関数 ${fmt(s.omitted_not_defined)} 件は表から除外しています。</div>`);
+          if (bad.length) health.push(`<div class="notice warn">Runs where the control failed: ${bad.map(r => esc(r.release + ' / ' + r.config)).join(', ')}</div>`);
+          if (s.omitted_not_defined) health.push(`<div class="notice">${fmt(s.omitted_not_defined)} functions declared in headers but not defined in the analyzed build are omitted from the table.</div>`);
           const controlRows = runs.map(run => {
             const items = (run.controls || []).map(c => `<code>${esc(c.name)}</code> ${c.reachable ? '✓' : '✗'}`).join(' / ');
             const escapes = (run.escape_points || []).map(e => `<code>${esc(e)}</code>`).join(', ');
             const head = run.head_sha ? ` <span class="muted">HEAD ${esc(String(run.head_sha).slice(0, 12))}</span>` : '';
-            return `<li><strong>${esc(run.release)} / ${esc(run.config)}</strong>${head}: ${items || '<span class="muted">データなし</span>'}<div class="muted">脱出点: ${escapes || '—'}</div></li>`;
+            return `<li><strong>${esc(run.release)} / ${esc(run.config)}</strong>${head}: ${items || '<span class="muted">No data</span>'}<div class="muted">Escape points: ${escapes || '—'}</div></li>`;
           }).join('');
-          health.push(`<details class="notice"><summary>対照実験と脱出点（${runs.length} 実行）</summary><ul>${controlRows}</ul></details>`);
+          health.push(`<details class="notice"><summary>Controls and escape points (${runs.length} runs)</summary><ul>${controlRows}</ul></details>`);
           $('health').innerHTML = health.join('');
 
           // Controls in footer-ish detail
