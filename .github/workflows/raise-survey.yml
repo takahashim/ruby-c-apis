@@ -21,7 +21,6 @@ on:
     paths:
       - "script/raise_survey/**"
       - ".github/workflows/raise-survey.yml"
-      - "notes/raise_survey_plan.ja.md"
   schedule:
     - cron: "0 3 1 * *"
 

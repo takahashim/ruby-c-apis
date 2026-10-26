@@ -1,20 +1,17 @@
 # ruby-c-apis
 
-CRuby の公開 C API が raise（longjmp）しうるかを、LLVM IR の呼び出しグラフから
-機械的に調べるツールです。計画は [`notes/raise_survey_plan.ja.md`](notes/raise_survey_plan.ja.md)
-にあります。
+Finds which public CRuby C API functions can raise (longjmp), by walking the call graph of LLVM IR.
 
-- ツール本体: [`script/raise_survey/`](script/raise_survey/)
-- GitHub Actions: [`.github/workflows/raise-survey.yml`](.github/workflows/raise-survey.yml)
-- 公開ページ: <https://takahashim.github.io/ruby-c-apis/>
-- 解析結果 JSON: <https://takahashim.github.io/ruby-c-apis/data.json>
+- Tool: [`script/raise_survey/`](script/raise_survey/)
+- Spec: [`docs/spec.md`](docs/spec.md)
+- Results: <https://takahashim.github.io/ruby-c-apis/> ([`data.json`](https://takahashim.github.io/ruby-c-apis/data.json))
+- Workflow: [`.github/workflows/raise-survey.yml`](.github/workflows/raise-survey.yml)
 
 [![raise-survey](https://github.com/takahashim/ruby-c-apis/actions/workflows/raise-survey.yml/badge.svg)](https://github.com/takahashim/ruby-c-apis/actions/workflows/raise-survey.yml)
 
-結果は関数ごとに `official`（`ruby/internal/` 以外の公式ヘッダ）と `internal`
-（`ruby/internal/` 配下）を区別して表示します。
+Each function is marked `official` (declared outside `ruby/internal/`) or `internal` (under `ruby/internal/`).
 
-## 使い方
+## Usage
 
 ```sh
 ruby script/raise_survey/run.rb --release 3.4.9 --work work --out out
@@ -22,12 +19,6 @@ ruby script/raise_survey/survey.rb --inputs out --out site
 open site/index.html
 ```
 
-詳しい前提、CI の設定、出力形式、限界は
-[`script/raise_survey/README.md`](script/raise_survey/README.md) を参照してください。
+See [`script/raise_survey/README.md`](script/raise_survey/README.md) for requirements and CI.
 
-## GitHub Actions
-
-`main` への push、手動実行、毎月のスケジュールで走ります。既定では最新パッチ版
-（3.3.13、3.4.12、4.0.9）と Ruby HEAD を、Linux x86_64 と macOS arm64 の 2 構成で
-調べます。結果は GitHub Pages に `index.html` と `data.json` としてデプロイされます。
-初回はリポジトリの **Settings → Pages → Source** を **GitHub Actions** にしてください。
+Japanese: [README.ja.md](README.ja.md)
