@@ -58,6 +58,21 @@ module RaiseSurvey
       raise "command failed: #{printable}" unless ok
     end
 
+    # Expand a simple make variable.  Ruby's Makefile uses
+    # LIBRUBY_A = lib$(RUBY_SO_NAME)-static.a, and RUBY_SO_NAME differs
+    # between platforms (libruby.3.4-static.a on macOS, libruby-static.a on
+    # Linux with --disable-shared).
+    def make_var(makefile, name, depth = 0)
+      return nil if depth > 10
+
+      raw = makefile[/^#{Regexp.escape(name)}\s*=\s*(.*)$/, 1]
+      return nil unless raw
+
+      raw.gsub(/\$[({]([A-Za-z0-9_]+)[)}]/) do
+        make_var(makefile, Regexp.last_match(1), depth + 1) || ""
+      end.strip
+    end
+
     def configure(src:, build:, prefix:, jobs:)
       src = File.expand_path(src)
       build = File.expand_path(build)
@@ -109,11 +124,8 @@ module RaiseSurvey
       run!(env, "make", "-j#{jobs}", "miniruby", chdir: build)
 
       makefile = File.read(File.join(build, "Makefile"))
-      major = makefile[/^MAJOR\s*=\s*(\d+)/, 1]
-      minor = makefile[/^MINOR\s*=\s*(\d+)/, 1]
-      raise "MAJOR/MINOR not found in Makefile" unless major && minor
-
-      run!(env, "make", "-j#{jobs}", "libruby.#{major}.#{minor}-static.a", chdir: build)
+      target = make_var(makefile, "LIBRUBY_A") || "libruby-static.a"
+      run!(env, "make", "-j#{jobs}", target, chdir: build)
     end
 
     def core_bitcode(build)
