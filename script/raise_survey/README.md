@@ -29,10 +29,10 @@ ruby script/raise_survey/survey.rb --inputs out --out site --repo-url https://gi
 
 `.github/workflows/raise-survey.yml`: `test` → `prepare` → `survey` (release × config) → `publish` (GitHub Pages).
 
-- Triggers: push to `main` touching the tool, `workflow_dispatch`, monthly schedule (all stable releases).
-- Inputs: `releases` (comma-separated, default `releases.txt`), `all_releases`, `indirect`.
+- Triggers: push to `main` touching the tool, `workflow_dispatch`, monthly schedule (default set).
+- Inputs: `releases` (comma-separated, default `releases.txt`), `all_releases` (every stable release), `indirect`.
 - First time: set **Settings → Pages → Source** to **GitHub Actions**.
-- `all_releases` is about 74 jobs; try the default set first.
+- Default set: first and latest patch release of each series plus HEAD (14 jobs, about 10 minutes). `all_releases` is about 76 jobs (about 45 minutes).
 - `HEAD` is pinned to the commit SHA at run time (`build.head_sha` in the result); `configure` is generated with `autogen.sh`.
 
 ## Output

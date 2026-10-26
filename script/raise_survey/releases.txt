@@ -1,5 +1,8 @@
-# Latest patch release of each supported series, plus Ruby HEAD.
+# First and latest patch release of each supported series, plus Ruby HEAD.
+3.3.0
 3.3.13
+3.4.0
 3.4.12
+4.0.0
 4.0.9
 HEAD

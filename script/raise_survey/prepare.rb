@@ -5,7 +5,7 @@
 #
 # Usage:
 #   ruby prepare.rb                     # releases.txt, linux + macos
-#   ruby prepare.rb --all               # every stable release >= 3.3
+#   ruby prepare.rb --every             # every stable release >= 3.3, plus HEAD
 #   ruby prepare.rb --releases 3.4.9,4.0.9
 #   ruby prepare.rb --configs linux-x86_64:ubuntu-24.04,macos-arm64:macos-14
 #
@@ -19,11 +19,11 @@ require_relative "fetch"
 ROOT = File.expand_path(__dir__)
 DEFAULT_CONFIGS = "linux-x86_64:ubuntu-24.04,macos-arm64:macos-14"
 
-options = { all: false, head: false, releases: nil, configs: DEFAULT_CONFIGS,
+options = { every: false, head: false, releases: nil, configs: DEFAULT_CONFIGS,
             file: File.join(ROOT, "releases.txt") }
 OptionParser.new do |opts|
-  opts.banner = "Usage: ruby prepare.rb [--all] [--head] [--releases LIST] [--configs LIST]"
-  opts.on("--all", "all stable releases >= 3.3, plus HEAD") { options[:all] = true }
+  opts.banner = "Usage: ruby prepare.rb [--every] [--head] [--releases LIST] [--configs LIST]"
+  opts.on("--every", "every stable release >= 3.3, plus HEAD") { options[:every] = true }
   opts.on("--head", "include Ruby HEAD") { options[:head] = true }
   opts.on("--releases LIST", "comma-separated versions") { |v| options[:releases] = v }
   opts.on("--configs LIST", "config:runner pairs") { |v| options[:configs] = v }
@@ -34,7 +34,7 @@ end.parse!
 versions =
   if options[:releases]
     options[:releases].split(",").map(&:strip).reject(&:empty?)
-  elsif options[:all]
+  elsif options[:every]
     RaiseSurvey::Fetch.stable_releases + ["HEAD"]
   else
     File.readlines(options[:file]).map(&:strip).reject { |line| line.empty? || line.start_with?("#") }

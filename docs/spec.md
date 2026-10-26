@@ -10,7 +10,9 @@ Japanese: [spec.ja.md](spec.ja.md)
 
 ## Scope
 
-- Releases: stable releases from 3.3.0 on, plus Ruby HEAD. No previews or RCs. Default set: `script/raise_survey/releases.txt`.
+- Releases: the first and latest patch release of each maintained series from 3.3 on, plus Ruby HEAD (`script/raise_survey/releases.txt`). No previews or RCs.
+  - Patch releases in between are not surveyed; they are assumed to behave like the ends. This is not guaranteed.
+  - Every stable release can be surveyed on demand (`all_releases`).
 - Configs: `linux-x86_64`, `macos-arm64`. Built with `-O0`.
 - Public API: functions declared by the headers in `include/` under the `rb_` / `ruby_` / `st_` / `onig` namespaces.
   - Headers under `ruby/internal/` are included: they are installed and part of the public API.

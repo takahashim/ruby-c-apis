@@ -439,6 +439,7 @@ module RaiseSurvey
             <section>
               <h2>Known limits</h2>
               <ul>
+                <li>Only the first and latest patch release of each maintained series (and HEAD) are surveyed. Releases in between may differ, and unmaintained series are not covered.</li>
                 <li>Only constant integer arguments and the branches they decide are tracked, so false positives (paths that cannot happen) remain.</li>
                 <li><code>NoMemoryError</code> from allocation is rarely documented in headers. This analysis covers it, but not the inside of external libraries.</li>
                 <li>"Can raise" is a candidate to be checked by reading the path; it may be a false positive.</li>

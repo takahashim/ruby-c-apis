@@ -10,7 +10,9 @@ English: [spec.md](spec.md)
 
 ## 範囲
 
-- リリース: 3.3.0 以降の安定版と Ruby HEAD。プレリリースは除く。既定は `script/raise_survey/releases.txt`。
+- リリース: 3.3 以降の保守中の各系列について、最初と最新のパッチ版と、Ruby HEAD（`script/raise_survey/releases.txt`）。プレリリースは除く。
+  - 間のパッチ版は調べない。両端と同じ振る舞いと見なすが、保証はない。
+  - 全安定版は手動実行（`all_releases`）で調べられる。
 - 構成: `linux-x86_64`、`macos-arm64`。`-O0` でビルドする。
 - 公開 API: `include/` のヘッダが宣言する `rb_` / `ruby_` / `st_` / `onig` の関数。
   - `ruby/internal/` 配下のヘッダも含める。インストールされる公開 API である。

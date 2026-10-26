@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       releases:
-        description: "カンマ区切りの Ruby バージョン（空なら releases.txt）"
+        description: "Comma-separated Ruby versions (empty: releases.txt)"
         required: false
         default: ""
       all_releases:
-        description: "3.3 以降の全安定版を調査する"
+        description: "Survey every stable release since 3.3"
         type: boolean
         default: false
       indirect:
-        description: "間接呼び出しの扱い"
+        description: "Indirect call model"
         type: choice
         options: [any, typed]
         default: any
@@ -65,13 +65,12 @@ jobs:
           bundler-cache: false
       - id: matrix
         env:
-          EVENT_NAME: ${{ github.event_name }}
           INPUT_RELEASES: ${{ inputs.releases }}
           INPUT_ALL: ${{ inputs.all_releases }}
         run: |
           args=()
-          if [ "$EVENT_NAME" = "schedule" ] || [ "$INPUT_ALL" = "true" ]; then
-            args+=(--all)
+          if [ "$INPUT_ALL" = "true" ]; then
+            args+=(--every)
           fi
           if [ -n "$INPUT_RELEASES" ]; then
             args+=(--releases "$INPUT_RELEASES")
