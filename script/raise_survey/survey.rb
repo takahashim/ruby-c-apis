@@ -250,7 +250,8 @@ module RaiseSurvey
           p.lead { margin: 0; color: var(--muted); max-width: 920px; }
           .meta { margin-top: 14px; color: var(--muted); font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; }
           main { padding: 26px 24px 70px; }
-          .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0 26px; }
+          .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 12px 0 16px; }
+          .summary { margin-top: 34px; }
           .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
           .card .num { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
           .card .label { color: var(--muted); font-size: 12.5px; }
@@ -340,15 +341,7 @@ module RaiseSurvey
           </div>
         </header>
         <main class="wrap">
-          <div class="cards">
-            <div class="card"><div class="num" id="stat-functions">—</div><div class="label">Functions surveyed</div></div>
-            <div class="card"><div class="num" id="stat-no-path">—</div><div class="label">No path in every release</div></div>
-            <div class="card"><div class="num" id="stat-raises">—</div><div class="label">Can raise in at least one release</div></div>
-            <div class="card"><div class="num" id="stat-mixed">—</div><div class="label">Partial or not analyzed</div></div>
-            <div class="card"><div class="num" id="stat-runs">—</div><div class="label">Runs</div></div>
-          </div>
-
-          <div id="health"></div>
+          <div id="alerts"></div>
 
           <div class="toolbar">
             <div class="search">
@@ -446,6 +439,18 @@ module RaiseSurvey
               </ul>
             </section>
           </div>
+
+          <section class="summary">
+            <h2>Summary</h2>
+            <div class="cards">
+              <div class="card"><div class="num" id="stat-functions">—</div><div class="label">Functions surveyed</div></div>
+              <div class="card"><div class="num" id="stat-no-path">—</div><div class="label">No path in every release</div></div>
+              <div class="card"><div class="num" id="stat-raises">—</div><div class="label">Can raise in at least one release</div></div>
+              <div class="card"><div class="num" id="stat-mixed">—</div><div class="label">Partial or not analyzed</div></div>
+              <div class="card"><div class="num" id="stat-runs">—</div><div class="label">Runs</div></div>
+            </div>
+            <div id="health"></div>
+          </section>
         </main>
         <footer class="wrap">
           <p>This page is generated from the results of <code>script/raise_survey/</code>. The data is available as <a href="data.json">data.json</a>.</p>
@@ -573,14 +578,16 @@ module RaiseSurvey
           $('stat-mixed').textContent = fmt(s.mixed);
           $('stat-runs').textContent = fmt(s.runs);
 
+          // Failures stay at the top; routine notices go to the summary at the bottom.
+          const alerts = [];
           const health = [];
           if (!s.controls_ok) {
-            health.push('<div class="notice bad"><strong>The reachability control failed.</strong> Functions known to raise were not found to have a path. Check the build logs before trusting the results.</div>');
+            alerts.push('<div class="notice bad"><strong>The reachability control failed.</strong> Functions known to raise were not found to have a path. Check the build logs before trusting the results.</div>');
           } else {
             health.push('<div class="notice">Reachability control: every function known to raise has a path.</div>');
           }
           const bad = runs.filter(r => !r.controls_ok);
-          if (bad.length) health.push(`<div class="notice warn">Runs where the control failed: ${bad.map(r => esc(r.release + ' / ' + r.config)).join(', ')}</div>`);
+          if (bad.length) alerts.push(`<div class="notice warn">Runs where the control failed: ${bad.map(r => esc(r.release + ' / ' + r.config)).join(', ')}</div>`);
           if (s.omitted_not_defined) health.push(`<div class="notice">${fmt(s.omitted_not_defined)} functions declared in headers but not defined in the analyzed build are omitted from the table.</div>`);
           const controlRows = runs.map(run => {
             const items = (run.controls || []).map(c => `<code>${esc(c.name)}</code> ${c.reachable ? '✓' : '✗'}`).join(' / ');
@@ -589,6 +596,7 @@ module RaiseSurvey
             return `<li><strong>${esc(run.release)} / ${esc(run.config)}</strong>${head}: ${items || '<span class="muted">No data</span>'}<div class="muted">Escape points: ${escapes || '—'}</div></li>`;
           }).join('');
           health.push(`<details class="notice"><summary>Controls and escape points (${runs.length} runs)</summary><ul>${controlRows}</ul></details>`);
+          $('alerts').innerHTML = alerts.join('');
           $('health').innerHTML = health.join('');
 
           // Controls in footer-ish detail
